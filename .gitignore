@@ -1,0 +1,15 @@
+# loop-engineer baseline ignores
+node_modules/
+.next/
+dist/
+build/
+.turbo/
+coverage/
+.venv/
+__pycache__/
+target/
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store

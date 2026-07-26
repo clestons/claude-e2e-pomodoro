@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>番茄钟 · Pomodoro Timer</title>
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-work: #FF6B35;
+      --bg-rest: #2ECC71;
+      --bg-dark: #1a1a2e;
+      --text-primary: #f0f0f5;
+      --text-secondary: #a0a0b8;
+      --button-bg: rgba(255, 255, 255, 0.12);
+      --button-hover: rgba(255, 255, 255, 0.22);
+      --button-disabled: rgba(255, 255, 255, 0.05);
+      --transition-bg: background-color 1s ease;
+      --font-mono: 'Courier New', 'SF Mono', 'Fira Code', monospace;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-primary);
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: var(--transition-bg);
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* Phase-dependent background tint via class on body */
+    body.phase-work  { background-color: var(--bg-work); }
+    body.phase-rest  { background-color: var(--bg-rest); }
+
+    /* ── Main Card ── */
+    .container {
+      width: 100%;
+      max-width: 480px;
+      padding: 2rem 1.5rem;
+      text-align: center;
+    }
+
+    /* ── Phase Label ── */
+    .phase-label {
+      font-size: 1.1rem;
+      font-weight: 500;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.8);
+      margin-bottom: 1rem;
+    }
+
+    /* ── Timer ── */
+    .timer {
+      font-family: var(--font-mono);
+      font-size: clamp(4rem, 12vw, 7rem);
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: 0.04em;
+      margin-bottom: 2rem;
+      text-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ── Controls ── */
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      margin-bottom: 2.5rem;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      padding: 0.75rem 1.8rem;
+      border: 2px solid rgba(255, 255, 255, 0.25);
+      border-radius: 999px;
+      background: var(--button-bg);
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: background 0.25s, border-color 0.25s, opacity 0.25s;
+      min-width: 100px;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--button-hover);
+      border-color: rgba(255, 255, 255, 0.45);
+    }
+
+    .btn:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+
+    .btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      background: var(--button-disabled);
+    }
+
+    .btn--primary {
+      border-color: rgba(255, 255, 255, 0.6);
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn--primary:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.32);
+    }
+
+    /* ── Stats ── */
+    .stats {
+      font-size: 0.875rem;
+      color: rgba(255, 255, 255, 0.7);
+      letter-spacing: 0.04em;
+    }
+
+    .stats strong {
+      color: var(--text-primary);
+      font-weight: 700;
+    }
+
+    /* ── Mobile ── */
+    @media (max-width: 480px) {
+      .container {
+        padding: 1.5rem 1rem;
+      }
+
+      .timer {
+        font-size: clamp(3rem, 14vw, 5rem);
+        margin-bottom: 1.5rem;
+      }
+
+      .controls {
+        gap: 0.75rem;
+        margin-bottom: 2rem;
+      }
+
+      .btn {
+        padding: 0.7rem 1.4rem;
+        font-size: 0.95rem;
+        min-width: 86px;
+      }
+
+      .phase-label {
+        font-size: 1rem;
+        letter-spacing: 0.25em;
+      }
+
+      .stats {
+        font-size: 0.8rem;
+      }
+    }
+
+    @media (max-width: 360px) {
+      .timer {
+        font-size: 2.8rem;
+      }
+
+      .btn {
+        padding: 0.6rem 1rem;
+        font-size: 0.88rem;
+        min-width: 72px;
+      }
+
+      .controls {
+        gap: 0.5rem;
+      }
+    }
+  </style>
+</head>
+<body class="phase-work">
+
+  <div class="container">
+    <!-- Phase indicator -->
+    <div class="phase-label" id="phaseLabel">工作中</div>
+
+    <!-- Countdown timer -->
+    <div class="timer" id="timerDisplay">25:00</div>
+
+    <!-- Control buttons -->
+    <div class="controls">
+      <button class="btn btn--primary" id="btnStart" type="button">开始</button>
+      <button class="btn" id="btnPause" type="button" disabled>暂停</button>
+      <button class="btn" id="btnReset" type="button">重置</button>
+    </div>
+
+    <!-- Stats footer -->
+    <div class="stats" id="statsFooter">
+      今日已完成 <strong id="todayCount">0</strong> 个番茄
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      // ── Constants ──────────────────────────────────────────────
+      var WORK_SECONDS = 25 * 60;   // 1500
+      var REST_SECONDS = 5 * 60;    // 300
+
+      var STORAGE_KEY = 'tomato_today_count';
+
+      // ── DOM refs ───────────────────────────────────────────────
+      var bodyEl = document.body;
+      var phaseLabelEl = document.getElementById('phaseLabel');
+      var timerDisplayEl = document.getElementById('timerDisplay');
+      var btnStartEl = document.getElementById('btnStart');
+      var btnPauseEl = document.getElementById('btnPause');
+      var btnResetEl = document.getElementById('btnReset');
+      var todayCountEl = document.getElementById('todayCount');
+
+      // ── State ──────────────────────────────────────────────────
+      var phase = 'work';          // 'work' | 'rest'
+      var remainingSeconds = WORK_SECONDS;
+      var isRunning = false;
+      var todayCount = 0;
+      var timerId = null;
+      var lastTickWall = null;     // wall-clock ms of last tick (for visibility-change correction)
+
+      // ── localStorage helpers ──────────────────────────────────
+      function storageAvailable() {
+        try {
+          var key = '__pomodoro_test__';
+          localStorage.setItem(key, '1');
+          localStorage.removeItem(key);
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      var hasStorage = storageAvailable();
+      if (!hasStorage) {
+        console.warn('[Pomodoro] localStorage 不可用，番茄计数仅保存在内存中，刷新页面后丢失。');
+      }
+
+      function getTodayDateStr() {
+        var d = new Date();
+        return d.getFullYear() + '-' +
+               String(d.getMonth() + 1).padStart(2, '0') + '-' +
+               String(d.getDate()).padStart(2, '0');
+      }
+
+      function loadTodayCount() {
+        if (!hasStorage) return 0;
+        try {
+          var raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return 0;
+          var data = JSON.parse(raw);
+          var today = getTodayDateStr();
+          if (data.date === today) {
+            return typeof data.count === 'number' ? data.count : 0;
+          }
+          // Different day — reset
+          return 0;
+        } catch (e) {
+          console.warn('[Pomodoro] 读取 localStorage 失败', e);
+          return 0;
+        }
+      }
+
+      function saveTodayCount(count) {
+        if (!hasStorage) return;
+        try {
+          var data = { date: getTodayDateStr(), count: count };
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        } catch (e) {
+          console.warn('[Pomodoro] 写入 localStorage 失败', e);
+        }
+      }
+
+      // ── Render ─────────────────────────────────────────────────
+      function formatTime(totalSeconds) {
+        var m = Math.floor(totalSeconds / 60);
+        var s = totalSeconds % 60;
+        return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+      }
+
+      function updateUI() {
+        // Timer display
+        timerDisplayEl.textContent = formatTime(remainingSeconds);
+
+        // Phase label & body class
+        if (phase === 'work') {
+          phaseLabelEl.textContent = '工作中';
+          bodyEl.className = 'phase-work';
+        } else {
+          phaseLabelEl.textContent = '休息中';
+          bodyEl.className = 'phase-rest';
+        }
+
+        // Button states
+        btnStartEl.disabled = isRunning;
+        btnPauseEl.disabled = !isRunning;
+
+        // Stats
+        todayCountEl.textContent = todayCount;
+      }
+
+      // ── Timer engine ───────────────────────────────────────────
+      function startTimer() {
+        if (isRunning) return;
+        if (remainingSeconds <= 0) return; // don't start if already at 0
+
+        isRunning = true;
+        lastTickWall = Date.now();
+        updateUI();
+
+        timerId = setInterval(tick, 1000);
+      }
+
+      function tick() {
+        if (!isRunning) return;
+
+        remainingSeconds -= 1;
+
+        if (remainingSeconds <= 0) {
+          remainingSeconds = 0;
+          handlePhaseEnd();
+          return;
+        }
+
+        updateUI();
+      }
+
+      function pauseTimer() {
+        if (!isRunning) return;
+        isRunning = false;
+        clearInterval(timerId);
+        timerId = null;
+        updateUI();
+      }
+
+      function resetTimer() {
+        isRunning = false;
+        clearInterval(timerId);
+        timerId = null;
+
+        remainingSeconds = (phase === 'work') ? WORK_SECONDS : REST_SECONDS;
+        updateUI();
+      }
+
+      function handlePhaseEnd() {
+        // Stop current timer
+        isRunning = false;
+        clearInterval(timerId);
+        timerId = null;
+
+        if (phase === 'work') {
+          // Work just finished → increment count, switch to rest
+          todayCount += 1;
+          saveTodayCount(todayCount);
+          phase = 'rest';
+          remainingSeconds = REST_SECONDS;
+        } else {
+          // Rest just finished → switch to work
+          phase = 'work';
+          remainingSeconds = WORK_SECONDS;
+        }
+
+        updateUI();
+      }
+
+      // ── Visibility change (tab-switch drift correction) ───────
+      function handleVisibilityChange() {
+        if (document.hidden) return;
+
+        // Tab visible again — if running, correct for elapsed wall-clock time
+        if (!isRunning) return;
+
+        var now = Date.now();
+        var elapsedSec = Math.round((now - lastTickWall) / 1000);
+
+        if (elapsedSec >= 1) {
+          var consume = Math.min(elapsedSec, remainingSeconds);
+          remainingSeconds -= consume;
+          lastTickWall = now;
+
+          if (remainingSeconds <= 0) {
+            remainingSeconds = 0;
+            handlePhaseEnd();
+            return;
+          }
+        }
+
+        updateUI();
+      }
+
+      // ── Event bindings ─────────────────────────────────────────
+      btnStartEl.addEventListener('click', startTimer);
+      btnPauseEl.addEventListener('click', pauseTimer);
+      btnResetEl.addEventListener('click', resetTimer);
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+
+      // ── Init ───────────────────────────────────────────────────
+      todayCount = loadTodayCount();
+      remainingSeconds = WORK_SECONDS; // start with work
+      phase = 'work';
+      isRunning = false;
+      updateUI();
+    })();
+  </script>
+</body>
+</html>
