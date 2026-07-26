@@ -324,6 +324,7 @@
       function tick() {
         if (!isRunning) return;
 
+        lastTickWall = Date.now();
         remainingSeconds -= 1;
 
         if (remainingSeconds <= 0) {
